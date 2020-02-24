@@ -173,13 +173,16 @@ int test_imx_scu(void)
 	int i;
 	int ret = 0;
 	ktime_t t1, t2;
-	unsigned long long burst_sum = 0;
-	unsigned long long avg_val;
 
-	static DEFINE_SPINLOCK(lock_avg_lock);
-	static unsigned long long long_avg_sum;
-	static int long_avg_cnt;
-	unsigned long long long_avg_val;
+        /* For this burst: */
+	unsigned long long burst_sum = 0;
+	unsigned long long burst_avg = 0;
+
+        /* Long-running average: */
+	static DEFINE_SPINLOCK(lock_total_avg);
+	static unsigned long long total_sum;
+	static int total_cnt;
+	unsigned long long total_avg;
 
 	for (i = 1; i <= burst_count; ++i) {
 		t1 = ktime_get();
@@ -197,17 +200,17 @@ int test_imx_scu(void)
 
 	/* Long running average: */
 	if (1) {
-		spin_lock(&lock_avg_lock);
-		long_avg_sum += burst_sum;
-		long_avg_cnt += burst_count;
-		long_avg_val = long_avg_sum;
-		do_div(long_avg_val, long_avg_cnt);
-		spin_unlock(&lock_avg_lock);
+		spin_lock(&lock_total_avg);
+		total_sum += burst_sum;
+		total_cnt += burst_count;
+		total_avg = total_sum;
+		do_div(total_avg, total_cnt);
+		spin_unlock(&lock_total_avg);
 	}
-	avg_val = burst_sum;
-	do_div(avg_val, burst_count);
-	pr_info("pass %s avg %lldns/call long_avg %lldns/call\n",
-			__func__, avg_val, long_avg_val);
+	burst_avg = burst_sum;
+	do_div(burst_avg, burst_count);
+	pr_info("pass %s burst_avg %lldns total_avg %lldns per iteration\n",
+			__func__, burst_avg, total_avg);
 
 	return 0;
 err:
