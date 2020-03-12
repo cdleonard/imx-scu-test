@@ -112,6 +112,9 @@ static int sc_rm_find_memreg(struct imx_sc_ipc *ipc, u8 *mr,
 
 	hdr->ver = IMX_SC_RPC_VERSION;
 	hdr->svc = IMX_SC_RPC_SVC_RM;
+#ifndef IMX_SC_RM_FUNC_FIND_MEMREG
+#define IMX_SC_RM_FUNC_FIND_MEMREG 30U
+#endif
 	hdr->func = IMX_SC_RM_FUNC_FIND_MEMREG;
 	hdr->size = 5;
 
