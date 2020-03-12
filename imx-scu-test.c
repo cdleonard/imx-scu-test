@@ -4,7 +4,7 @@
 #include <linux/version.h>
 #include <asm/bug.h>
 
-#if (LINUX_VERSION_CODE <= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
 #include <soc/imx8/sc/scfw.h>
 #include <soc/imx8/sc/types.h>
 #include <soc/imx8/sc/ipc.h>
