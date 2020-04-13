@@ -177,11 +177,11 @@ int test_imx_scu(void)
 	int ret = 0;
 	ktime_t t1, t2;
 
-        /* For this burst: */
+	/* For this burst: */
 	unsigned long long burst_sum = 0;
 	unsigned long long burst_avg = 0;
 
-        /* Long-running average: */
+	/* Long-running average: */
 	static DEFINE_SPINLOCK(lock_total_avg);
 	static unsigned long long total_sum;
 	static int total_cnt;
