@@ -4,6 +4,15 @@
 #include <linux/version.h>
 #include <asm/bug.h>
 
+/*
+ * Compatibility layer between old imx kernels (4.14/4.19) and upstream
+ * approach.
+ *
+ * Older versions of imx kernel use generated functions, this test module uses
+ * them as well and defines equivalents for new kernels.
+ * Older kernels report sc_err_t while new kernels convert this to -errno, test
+ * code only checks for "success".
+ */
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0))
 #include <soc/imx8/sc/scfw.h>
 #include <soc/imx8/sc/types.h>
