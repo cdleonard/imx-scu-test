@@ -2,6 +2,7 @@
 #include <linux/module.h>
 #include <linux/kthread.h>
 #include <linux/version.h>
+#include <linux/slab.h>
 #include <asm/bug.h>
 
 /*
@@ -244,17 +245,27 @@ static int imx_scu_thread_test_main(void* arg)
 	return 0;
 }
 
-#define TEST_THREAD_COUNT 1
-static struct task_struct *th[TEST_THREAD_COUNT];
+static int thread_count = 1;
+module_param(thread_count, int, 0);
+static struct task_struct **th;
 
 static int imx_scu_thread_test_init(void)
 {
 	int i;
+	int ret;
 
 	pr_info("%s\n", __func__);
-	test_imx_scu();
+	ret = test_imx_scu();
+	pr_info("initial test_imx_scu result %d\n", ret);
+	if (ret)
+		return ret;
 
-	for (i = 0; i < TEST_THREAD_COUNT; ++i) {
+	th = kmalloc(sizeof(*th) * thread_count, GFP_KERNEL);
+	if (!th) {
+		pr_err("kmalloc failed\n");
+		return -ENOMEM;
+	}
+	for (i = 0; i < thread_count; ++i) {
 		th[i] = kthread_run(imx_scu_thread_test_main, 0, "scu-test%d", i);
 		if (IS_ERR(th[i])) {
 			printk("Failed kthread_run: %d\n", (int)PTR_ERR(th));
@@ -271,12 +282,16 @@ static void imx_scu_thread_test_exit(void)
 	int i;
 
 	pr_info("%s\n", __func__);
-	for (i = 0; i < TEST_THREAD_COUNT; ++i) {
+	if (!th)
+		return;
+	for (i = 0; i < thread_count; ++i) {
 		if (th[i]) {
 			kthread_stop(th[i]);
 			th[i] = NULL;
 		}
 	}
+	kfree(th);
+	th = NULL;
 }
 
 int test_imx_scu_threads(void)
