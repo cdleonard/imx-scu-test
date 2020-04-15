@@ -20,6 +20,7 @@
 #include <soc/imx8/sc/ipc.h>
 #include <soc/imx8/sc/svc/misc/api.h>
 #include <soc/imx8/sc/svc/rm/api.h>
+#include <soc/imx8/sc/svc/seco/api.h>
 
 static sc_ipc_t ipc;
 
@@ -142,7 +143,118 @@ static int sc_rm_find_memreg(struct imx_sc_ipc *ipc, u8 *mr,
 
 	return 0;
 }
+
+
+struct imx_sc_msg_req_seco_config {
+	struct imx_sc_rpc_msg hdr;
+	u32 data0;
+	u32 data1;
+	u32 data2;
+	u32 data3;
+	u32 data4;
+	u8 id;
+	u8 access;
+	u8 size;
+} __packed __aligned(4);
+
+struct imx_sc_msg_resp_seco_config {
+	struct imx_sc_rpc_msg hdr;
+	u32 data0;
+	u32 data1;
+	u32 data2;
+	u32 data3;
+	u32 data4;
+} __packed;
+
+struct imx_sc_msg_seco_config {
+	union {
+		struct imx_sc_msg_req_seco_config req;
+		struct imx_sc_msg_req_seco_config rsp;
+	};
+};
+
+int sc_seco_secvio_config(struct imx_sc_ipc *ipc, uint8_t id, uint8_t access,
+		uint32_t *data0, uint32_t *data1,
+		uint32_t *data2, uint32_t *data3,
+		uint32_t *data4, uint8_t size)
+{
+	struct imx_sc_msg_seco_config msg;
+	struct imx_sc_rpc_msg *hdr = &msg.req.hdr;
+	int ret;
+
+	hdr->ver = IMX_SC_RPC_VERSION;
+	hdr->size = 7;
+	hdr->svc = IMX_SC_RPC_SVC_SECO;
+	hdr->func = IMX_SC_SECO_FUNC_SECVIO_CONFIG;
+
+	msg.req.data0 = *data0;
+	msg.req.data1 = *data1;
+	msg.req.data2 = *data2;
+	msg.req.data3 = *data3;
+	msg.req.data4 = *data4;
+	msg.req.id = id;
+	msg.req.access = access;
+	msg.req.size = size;
+
+	ret = imx_scu_call_rpc(ipc, &msg, true);
+	//pr_debug("result ret %d data %px %*phN\n", ret, &msg.rsp.data0, 20, &msg.rsp.data0);
+
+	*data0 = msg.rsp.data0;
+	*data1 = msg.rsp.data1;
+	*data2 = msg.rsp.data2;
+	*data3 = msg.rsp.data3;
+	*data4 = msg.rsp.data4;
+
+	return ret;
+}
 #endif
+
+/* Test secvio calls: long TX+RX */
+int imx_scu_test_secvio(void)
+{
+        /*
+	 * See:
+	 * gs_imx_secvio_info_list in imx_5.4.y
+	 * s_snvs_sc_reglist in imx_4.14.y
+	 * cat /sys/kernel/debug/scu:secvio
+	 */
+	static const uint8_t id = 0xf8; // LPTGFC
+	static const uint8_t access = 0; // READ
+	static const uint8_t size = 2;
+	static bool has_saved_result = false;
+	static uint32_t saved_data[5];
+	int err;
+	uint32_t data[5] = {7, 13, 17, 19, 23};
+
+	BUILD_BUG_ON(sizeof(data) != 20);
+
+	err = sc_seco_secvio_config(ipc, id, access,
+			&data[0], &data[1], &data[2], &data[3], &data[4],
+			size);
+	if (err) {
+		printk("unexpected sc_secvio_config err=%d"
+                        " id=0x%x access=0x%x data %*phN\n",
+                        err, id, access, (int)sizeof(data), data);
+		return -1;
+	}
+	if (!has_saved_result) {
+		memcpy(saved_data, data, sizeof(data));
+		printk("secvio test err=%d data: %*phN\n",
+				err,
+                                (int)sizeof(data), data);
+		has_saved_result = true;
+	} else {
+		if (memcmp(data, saved_data, sizeof(data))) {
+			printk("diff result err=%d data=%*phN saved=%*phN\n",
+                                err,
+                                (int)sizeof(data), data,
+                                (int)sizeof(saved_data), saved_data);
+			return -1;
+		}
+	}
+
+	return 0;
+}
 
 /*
  * Call imx_sc_rm_find_memreg.
@@ -204,6 +316,9 @@ int test_imx_scu(void)
 		if (ret)
 			goto err;
 		ret = imx_scu_test_memreg();
+		if (ret)
+			goto err;
+		ret = imx_scu_test_secvio();
 		if (ret)
 			goto err;
 
